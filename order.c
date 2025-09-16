@@ -3,9 +3,17 @@
 #include<stdlib.h>
 #include<ctype.h>
 #define MAX_LINE 1024
-//--help命令输出
+//--help命令输出(1.1)
 void print_help();
+
+//预处理与文件读取（1.2）
 void process_makefile(int verbose);
+//去除尾部空格
+void trim_trailing_spaces(char *line);
+//去除注释(#后的内容)包括去除注释后的空行和行尾空格
+void remove_comments(char *line);
+//过滤空行
+int is_blank_line(const char *line);
 int main(int argc,char *argv[]){
 int verbose=0;
 //处理无参数情况
@@ -52,10 +60,75 @@ if(infile==NULL){
 perror("无法打开Makefile文件。\n");
 return;
 }
-char buf[MAX_LINE];
-while(fgets(buf,sizeof(buf),infile)!=NULL){
-    printf("%s",buf);
-}
+//进入调试模式
+if(verbose==1){
+outfile=fopen("./Makefile_cleared.mk","w");
+if(outfile==NULL){
+perror("无法创建输出文件Minimake_claered.mk");
 fclose(infile);
 return;
+}
+}
+// 逐行读取并处理
+printf("正在处理Makefile...\n");
+char line[MAX_LINE];
+while(fgets(line,sizeof(line),infile)!=NULL){
+// 去除注释
+remove_comments(line);
+// 去除行尾空格
+trim_trailing_spaces(line);
+// 过滤空行
+if (is_blank_line(line)) {
+continue;
+}
+// 输出清理后的行
+if (verbose) {
+fputs(line, outfile);
+fputs("\n", outfile);  // 重新添加换行符
+} 
+else {
+printf("%s\n", line);  // 非调试模式下打印到控制台
+}    
+}
+// 检查读取错误
+if (ferror(infile)) {
+perror("读取文件时发生错误");
+}
+fclose(infile);
+if (verbose && outfile != NULL) {
+fclose(outfile);
+printf("处理完成，清理后的内容已保存到Minimake_claered.mk\n");
+} 
+else if (!verbose) {
+printf("处理完成\n");
+}    
+}
+
+int is_blank_line(const char *line){
+if(line==NULL||*line=='\0'){
+    return 1;
+}
+while(*line!='\0'){
+if(!isspace((unsigned char )*line)){
+return 0;
+}
+line++;
+}
+return 1;
+}
+
+void trim_trailing_spaces(char *line){
+if(line==NULL||*line=='\0') return;
+int len=strlen(line);
+while(len>0&&isspace((unsigned char)line[len-1])){
+    len--;
+}
+line[len]='\0';
+}
+void remove_comments(char *line){
+if(line==NULL||*line=='\0') return;
+char *firstcomment=strchr(line,'#');
+if(firstcomment!=NULL){
+*firstcomment='\0';// 在#处截断字符串
+}
 }
