@@ -14,6 +14,24 @@ void trim_trailing_spaces(char *line);
 void remove_comments(char *line);
 //过滤空行
 int is_blank_line(const char *line);
+
+//静态语法检查（1.3）
+//错误类型枚举
+typedef enum{
+NO_ERROR,
+MISS_COLON,
+MISS_TAB,
+COMMAND_BEFORE_RULE
+}ErrorType;
+//打印错误信息
+void print_error(int line_num,ErrorType error);
+// 检查一行是否为目标行（包含冒号）
+int is_target_line(const char *line);
+// 检查一行是否为命令行（应该以Tab开头）
+int is_command_line(const char *line);
+//检查行错误
+ErrorType check_line_error(const char *line, int has_seen_rule);
+
 int main(int argc,char *argv[]){
 int verbose=0;
 //处理无参数情况
@@ -131,4 +149,49 @@ char *firstcomment=strchr(line,'#');
 if(firstcomment!=NULL){
 *firstcomment='\0';// 在#处截断字符串
 }
+}
+
+void print_error(int line_num,ErrorType error){
+printf("line%d: ",line_num);
+switch(error){
+case MISS_COLON:
+    printf("Missing colon in target definition!\n");
+    break;
+case MISS_TAB:
+    printf("Command found start without a tab!\n");
+    break;
+case COMMAND_BEFORE_RULE:
+    printf("Command found before rule\n");
+    break;
+default:
+    break;
+}
+}
+
+int is_target_line(const char *line){
+//跳过开头的空白字符
+const char * ptr=line;
+while(*ptr&&isspace((unsigned char)*ptr)&&*ptr!='\t'){
+ptr++;
+}
+//当首个非空白字符（或者是Tab）不是Tab且存在：时，返回非0表示时目标行
+return *ptr!='\t';
+}
+
+int is_command_line(const char *line){
+//跳过开头的空白字符(不包括Tab)
+const char *ptr=line;
+while(*ptr&&issspace((unsigned char)*ptr)){
+if(*ptr=='\t'){
+    return 1;
+}
+ptr++;
+}
+return 0;
+}
+
+ErrorType check_line_error(const char *line, int has_seen_rule){
+int is_target=is_target_line(line);
+int is_command=is_command_line
+
 }
