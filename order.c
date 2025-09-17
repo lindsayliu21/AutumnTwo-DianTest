@@ -16,6 +16,7 @@ void remove_comments(char *line);
 int is_blank_line(const char *line);
 
 //静态语法检查（1.3）
+void rule_checker();
 //错误类型枚举
 typedef enum{
 NO_ERROR,
@@ -25,12 +26,11 @@ COMMAND_BEFORE_RULE
 }ErrorType;
 //打印错误信息
 void print_error(int line_num,ErrorType error);
-// 检查一行是否为目标行（包含冒号）
-int is_target_line(const char *line);
-// 检查一行是否为命令行（应该以Tab开头）
-int is_command_line(const char *line);
+// 检查一行为目标行还是命令行(检查开头是否有空格，返回：1：目标行；0：命令行)
+int is_target_or_command_line(const char *line);
 //检查行错误
 ErrorType check_line_error(const char *line, int has_seen_rule);
+
 
 int main(int argc,char *argv[]){
 int verbose=0;
@@ -57,7 +57,9 @@ printf("Try 'program --help' for more information.\n");
 return 1;
 }
 }
+if(verbose==1){
 process_makefile(verbose);
+rule_checker();}
 return 0;
 }
 
@@ -67,7 +69,7 @@ printf("usage: git [-v | --version] [-h | --help] [-C <path>] [-c <name>=<value>
            "           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]\n"
            "           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--bare]\n"
            "           [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]\n"
-           "           [--config-env=<name>=<envvar>] <command> [<args>]");
+           "           [--config-env=<name>=<envvar>] <command> [<args>]\n");
 }
 
 
@@ -168,30 +170,53 @@ default:
 }
 }
 
-int is_target_line(const char *line){
-//跳过开头的空白字符
-const char * ptr=line;
-while(*ptr&&isspace((unsigned char)*ptr)&&*ptr!='\t'){
-ptr++;
-}
-//当首个非空白字符（或者是Tab）不是Tab且存在：时，返回非0表示时目标行
-return *ptr!='\t';
-}
-
-int is_command_line(const char *line){
-//跳过开头的空白字符(不包括Tab)
+int is_target_or_command_line(const char *line){
 const char *ptr=line;
-while(*ptr&&issspace((unsigned char)*ptr)){
-if(*ptr=='\t'){
-    return 1;
-}
-ptr++;
-}
-return 0;
+if(*ptr){
+if(isspace((unsigned char)*ptr)) return 0;//开头有空白字符，返回0，表示为规则行
+else return 1;//开头没有空白字符，返回1，表示为目标行
 }
 
-ErrorType check_line_error(const char *line, int has_seen_rule){
-int is_target=is_target_line(line);
-int is_command=is_command_line
+}
 
+ErrorType check_line_error(const char *line, int rule_flag){
+int is_t_or_c=is_target_or_command_line(line);
+//检查目标行是否缺少冒号：
+if(is_t_or_c){
+const char *ptr=line;
+if(strchr(ptr,':')==NULL)  return MISS_COLON;
+}
+//检查命令行是否缺少Tab
+else if(!is_t_or_c){
+const char *ptr=line;
+if(*ptr!='\t') return MISS_TAB;
+
+// 检查命令是否在规则之前出现
+if (rule_flag%2==0) return COMMAND_BEFORE_RULE;
+}        
+return NO_ERROR;
+
+}
+
+void rule_checker(){
+FILE *rulefile=fopen("./Makefile_cleared.mk","r");
+if(ferror(rulefile)){
+perror("Error opening Makefile_cleared.mk!!");
+}
+char line[MAX_LINE];
+int line_num = 0;
+int rule_flag = 0; // 标记是否已遇到规则定义
+//逐行读取并处理
+printf("正在对Makefile_cleared.mk文件进行静态语法处理...\n");
+while(fgets(line,sizeof(line),rulefile)){
+ line_num++;
+ ErrorType error=check_line_error(line,rule_flag);
+ if(error!=NO_ERROR){
+print_error(line_num,error);
+ }
+ if(is_target_or_command_line(line)) rule_flag=1;
+ else rule_flag+=2;
+}
+fclose(rulefile);
+return ;
 }
