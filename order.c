@@ -33,34 +33,34 @@ ErrorType check_line_error(const char *line, int has_seen_rule);
 
 
 int main(int argc,char *argv[]){
-int verbose=0;
-//处理无参数情况
-if(argc==1){
-printf("Error:No argument provided!\n");
-printf("Try 'program --help' for more information.\n");
-return 1;
-}
-//命令行参数解析
-for(int i=1;i<argc;i++){
-if(strcmp(argv[i],"--help")==0){
+    int verbose=0;
+    //处理无参数情况
+    if(argc==1){
+    printf("Error:No argument provided!\n");
+    printf("Try 'program --help' for more information.\n");
+    return 1;
+    }
+    //命令行参数解析
+    for(int i=1;i<argc;i++){
+    if(strcmp(argv[i],"--help")==0){
     print_help();
-}
-//判断是否进入调试模式（-v/--verbose)
-else if((strcmp(argv[i],"-v")==0)||(strcmp(argv[i],"--verbose")==0)){
-verbose=1;
-break;
-}
-else {
-// 处理无效参数
-printf("Error: Invalid argument '%s'\n", argv[i]);
-printf("Try 'program --help' for more information.\n");
-return 1;
-}
-}
-if(verbose==1){
-process_makefile(verbose);
-rule_checker();}
-return 0;
+    }
+    //判断是否进入调试模式（-v/--verbose)
+    else if((strcmp(argv[i],"-v")==0)||(strcmp(argv[i],"--verbose")==0)){
+    verbose=1;
+    break;
+    }
+    else {
+    // 处理无效参数
+    printf("Error: Invalid argument '%s'\n", argv[i]);
+    printf("Try 'program --help' for more information.\n");
+    return 1;
+    }
+    }
+    if(verbose==1){
+    process_makefile(verbose);
+    rule_checker();}
+    return 0;
 }
 
 
