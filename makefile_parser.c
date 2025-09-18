@@ -42,8 +42,12 @@ void parse_makefile(const char *filename);
 //检查依赖是否有效
 void check_dependencies(ParserState *state);
 
-int main(){
-
+int main(int argc,char *argv[]){
+if (argc != 2) {
+    printf("用法: %s <makefile>\n", argv[0]);
+    return 1;
+    }
+parse_makefile(argv[1]);
     return 0;
 }
 
@@ -55,9 +59,8 @@ void init_parser(ParserState *state) {
 
 int is_target_defined(ParserState *state, const char *target){
 for(int i=0;i<state->rule_count;i++){
-    if(strcmp(state->rules[i].target,target))
+    if(strcmp(state->rules[i].target,target)==0)
     return i;//返回已定义的规则索引
-    else i++;
 }
 return -1;//目标未定义
 }
@@ -65,4 +68,93 @@ return -1;//目标未定义
 int is_file_exists(const char *filename){
     struct stat statbuf;
     return(stat(filename,&statbuf)==0);//返回1表示文件存在
+}
+
+void check_dependencies(ParserState *state){
+    for(int i=0;i<state->rule_count;i++){
+    Rule *rule=&state->rules[i];
+    for(int j=0;j<rule->dep_count;j++){
+    const char *dep=rule->dependencies[j];
+    int is_valid=0;
+
+    if(is_target_defined(state,dep)!=-1) is_valid=1;
+    else if(is_file_exists(dep)==1) is_valid=1;
+    // 如果依赖无效，输出错误
+    if (!is_valid) {
+    printf("Line%d: Invalid dependency '%s' \n", rule->line_num, dep);
+    }
+
+    }
+}
+}
+
+void parse_makefile(const char *filename){
+FILE * file=fopen(filename,"r");
+if(!file){
+    perror("failed to open file!!\n");
+}
+ParserState state;
+init_parser(&state);
+    
+char line[MAX_LINE_LEN];
+int line_num = 0;
+Rule *current_rule = NULL;
+while(fgets(line,sizeof(line),file)){
+    line_num++;
+// 检查是否为目标行（不以Tab开头）
+if (line[0] != '\t') {
+// 查找冒号分隔符
+char *colon = strchr(line, ':');
+if (colon) {
+// 分割目标和依赖
+*colon = '\0';
+char *target_str = line;
+char *deps_str = colon + 1;
+// 检查目标是否为空
+if (strlen(target_str) == 0) {
+printf("Line%d: Invalid target defined!!\n", line_num);
+
+}
+// 检查目标是否已定义
+int existing_idx = is_target_defined(&state, target_str);
+if (existing_idx != -1) {
+printf("Line%d: Duplicate target definition '%s'\n",line_num, target_str);
+printf("Line%d: 先前定义在此处\n", state.rules[existing_idx].line_num);
+
+}
+current_rule = &state.rules[state.rule_count++];
+strncpy(current_rule->target, target_str, MAX_FILE_NAME_LEN - 1);
+current_rule->target[MAX_FILE_NAME_LEN - 1] = '\0';
+current_rule->dep_count = 0;
+current_rule->cmd_count = 0;
+current_rule->line_num = line_num;
+
+//解析依赖
+char *dep=strtok(deps_str," ");
+while(dep){
+if(strlen(dep)>0){
+   strncpy(current_rule->dependencies[current_rule->dep_count],dep,MAX_FILE_NAME_LEN-1);
+   current_rule->dependencies[current_rule->dep_count][MAX_FILE_NAME_LEN-1]='\0';
+   current_rule->dep_count++;
+}
+dep = strtok(NULL, " ");
+}
+
+}
+}
+//有Tab,则为命令行
+else{
+//存储命令，去除开头的Tab
+char *cmd=line+1;
+if(strlen(cmd)>0){
+strncpy(current_rule->commands[current_rule->cmd_count].cmd,cmd,MAX_LINE_LEN-1);
+current_rule->commands[current_rule->cmd_count].cmd[MAX_LINE_LEN-1]='\0';
+current_rule->cmd_count++;
+}
+}
+
+}
+fclose(file);
+// 检查所有依赖的有效性
+check_dependencies(&state);
 }
