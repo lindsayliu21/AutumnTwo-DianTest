@@ -101,6 +101,7 @@ int line_num = 0;
 Rule *current_rule = NULL;
 while(fgets(line,sizeof(line),file)){
     line_num++;
+    line[strcspn(line,"\n\r")]='\0';
 // 检查是否为目标行（不以Tab开头）
 if (line[0] != '\t') {
 // 查找冒号分隔符
@@ -118,8 +119,8 @@ printf("Line%d: Invalid target defined!!\n", line_num);
 // 检查目标是否已定义
 int existing_idx = is_target_defined(&state, target_str);
 if (existing_idx != -1) {
-printf("Line%d: Duplicate target definition '%s'\n",line_num, target_str);
-printf("Line%d: 先前定义在此处\n", state.rules[existing_idx].line_num);
+printf("Line%d: Duplicate target definition '%s'.  ",line_num, target_str);
+printf(" The previous definition is right here: Line%d\n", state.rules[existing_idx].line_num);
 
 }
 current_rule = &state.rules[state.rule_count++];
