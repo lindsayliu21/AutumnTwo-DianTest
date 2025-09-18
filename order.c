@@ -44,6 +44,7 @@ int main(int argc,char *argv[]){
     for(int i=1;i<argc;i++){
     if(strcmp(argv[i],"--help")==0){
     print_help();
+    return 0;
     }
     //判断是否进入调试模式（-v/--verbose)
     else if((strcmp(argv[i],"-v")==0)||(strcmp(argv[i],"--verbose")==0)){
@@ -200,8 +201,9 @@ return NO_ERROR;
 
 void rule_checker(){
 FILE *rulefile=fopen("./Makefile_cleared.mk","r");
-if(ferror(rulefile)){
+if(rulefile==NULL){
 perror("Error opening Makefile_cleared.mk!!");
+return;
 }
 char line[MAX_LINE];
 int line_num = 0;
