@@ -13,6 +13,29 @@
 #define MAX_RULES 30         // 每个目标最大依赖数量
 #define MAX_DEPEND_NUM 30    // 每个目标最大依赖数量
 #define MAX_COMMAND_NUM 30   // 每个目标最大命令数量
+#define MAX_NODES 50
+#define MAX_EDGES 100 
+
+//节点结构体
+typedef struct{
+    char name[MAX_FILE_NAME_LEN];
+    int in_degree;
+    int out_degree;
+}Node;
+
+//边结构体
+typedef struct {
+    int from;
+    int to;
+}Edge;
+
+//依赖图结构体
+typedef struct{
+    Node nodes[MAX_NODES];
+    Edge edges[MAX_EDGES];
+    int node_count;
+    int edge_count;
+}DependencyGraph;
 
 // 命令结构体
 typedef struct
@@ -45,14 +68,21 @@ int is_target_defined(ParserState *state, const char *target);
 // 检查文件是否存在
 int is_file_exists(const char *filename);
 //// 解析Makefile并检查规则
-void parse_makefile(const char *filename,ParserState *state);
+void parse_makefile(const char *filename,ParserState *state,DependencyGraph *graph);
 // 检查依赖是否有效
 void check_dependencies(ParserState *state);
 // 执行命令
 int execute_command(const char *cmd);
 // 执行目标
 int execute_target(ParserState *state, const char *target);
-
+//初始化依赖图
+void init_graph(DependencyGraph *graph);
+//找到和增加节点（目标、依赖、文件）
+int find_or_add_node(DependencyGraph *graph, const char *name);
+//加边（增加了节点之后加边）
+void add_edges(DependencyGraph *graph, const char *from,const char *to);
+//打印依赖图，各个目标/依赖的入度（目标）、出度（依赖）
+void print_dependency_graph(DependencyGraph *graph);
 int main(int argc, char *argv[])
 {
     if (argc != 3) {
@@ -60,13 +90,18 @@ int main(int argc, char *argv[])
         printf("示例: %s Makefile app\n", argv[0]);
         return 1;
     }
+    DependencyGraph graph;
     ParserState state;
+    init_graph(&graph);
     init_parser(&state);
     // 解析Makefile
-    parse_makefile(argv[1], &state);
+    parse_makefile(argv[1], &state,&graph);
     
     // 检查依赖
     check_dependencies(&state);
+
+    //输出依赖图
+    print_dependency_graph(&graph);
     
     // 执行指定目标
     int result = execute_target(&state, argv[2]);
@@ -74,12 +109,58 @@ int main(int argc, char *argv[])
     return result;
 }
 
+void init_graph(DependencyGraph *graph){
+    graph->node_count=0;
+    graph->edge_count=0;
+    memset(graph->nodes,0,sizeof(graph->nodes));
+    memset(graph->edges,0,sizeof(graph->edges));
+}
 void init_parser(ParserState *state)
 {
     state->rule_count = 0;
     memset(state->rules, 0, sizeof(state->rules));
 }
 
+int find_or_add_node(DependencyGraph *graph, const char *name){
+    //检查节点是否已经存在
+    for(int i=0;i<graph->node_count;i++){
+        if(strcmp(graph->nodes[i].name,name)==0){
+        return i;}
+    }
+    if(graph->node_count<MAX_NODES){
+        strncpy(graph->nodes[graph->node_count].name,name,MAX_FILE_NAME_LEN-1);
+        graph->nodes[graph->node_count].name[MAX_FILE_NAME_LEN-1]='\0';
+        graph->nodes[graph->node_count].in_degree=0;
+        graph->nodes[graph->node_count].out_degree=0;
+        return graph->node_count++;
+        
+    }
+    //节点数量达到上限
+    return -1;
+}
+
+void add_edges(DependencyGraph *graph, const char *from,const char *to){
+    const int from_idx=find_or_add_node(graph,from);
+    const int to_idx=find_or_add_node(graph,to);
+    if(from_idx==-1||to_idx==-1){
+        printf("error:failed to add edge %s->%s!!",from,to);
+        exit(1);
+    }
+    //更新节点的度数
+    graph->nodes[from_idx].in_degree++;
+    graph->nodes[from_idx].out_degree++;
+    //添加边
+    if(graph->edge_count<MAX_EDGES){
+        graph->edges[graph->edge_count].from=from_idx;
+        graph->edges[graph->edge_count].to=to_idx;
+        graph->edge_count++;
+    }
+    else{
+        printf("error:too many edges!!");
+        exit(1);
+    }
+    
+}
 int is_target_defined(ParserState *state, const char *target)
 {
     for (int i = 0; i < state->rule_count; i++)
@@ -119,7 +200,7 @@ void check_dependencies(ParserState *state)
     }
 }
 
-void parse_makefile(const char *filename,ParserState *state)
+void parse_makefile(const char *filename,ParserState *state,DependencyGraph *graph)
 {
     FILE *file = fopen(filename, "r");
     if (!file)
@@ -151,6 +232,7 @@ void parse_makefile(const char *filename,ParserState *state)
                 {
                     printf("Line%d: Invalid target defined!!\n", line_num);
                 }
+                
                 // 检查目标是否已定义
                 int existing_idx = is_target_defined(state, target_str);
                 if (existing_idx != -1)
@@ -158,6 +240,9 @@ void parse_makefile(const char *filename,ParserState *state)
                     printf("Line%d: Duplicate target definition '%s'.  ", line_num, target_str);
                     printf(" The previous definition is right here: Line%d\n", state->rules[existing_idx].line_num);
                 }
+                //将目标加入节点列表中
+                find_or_add_node(graph,target_str);
+
                 current_rule = &state->rules[state->rule_count++];
                 strncpy(current_rule->target, target_str, MAX_FILE_NAME_LEN - 1);
                 current_rule->target[MAX_FILE_NAME_LEN - 1] = '\0';
@@ -174,6 +259,8 @@ void parse_makefile(const char *filename,ParserState *state)
                         strncpy(current_rule->dependencies[current_rule->dep_count], dep, MAX_FILE_NAME_LEN - 1);
                         current_rule->dependencies[current_rule->dep_count][MAX_FILE_NAME_LEN - 1] = '\0';
                         current_rule->dep_count++;
+                        find_or_add_node(graph,dep);
+                        add_edges(graph,target_str,dep);
                     }
                     dep = strtok(NULL, " ");
                 }
@@ -248,4 +335,42 @@ int execute_target(ParserState *state, const char *target)
         return result;
     }
     return 0;
+}
+
+void print_dependency_graph(DependencyGraph *graph){
+printf("\n========== Makefile 依赖图 ==========\n");
+//打印所有节点
+printf("节点列表（共 %d 个）：\n",graph->node_count);
+printf("序号\t节点名称\t\t入度\t出度\n");
+printf("----------------------------------------\n");
+for(int i=0;i<graph->node_count;i++){
+    Node *node=&graph->nodes[i];
+    printf("%d\t%-20s\t%d\t%d\n",i,node->name,node->in_degree,node->out_degree);
+}
+
+//打印所有边
+printf("\n边列表（共 %d 条）：\n",graph->edge_count);
+printf("序号\t源节点——>目标节点\n");
+for(int i=0;i<graph->edge_count;i++){
+    Edge *edge=&graph->edges[i];
+    printf("%d\t%s\t%s\n",i,graph->nodes[edge->from].name,graph->nodes[edge->to].name);
+}
+
+//打印邻接表形式
+printf("\n邻接表形式：\n");
+for(int i=0;i<graph->node_count;i++){
+    Node *node=&graph->nodes[i];
+    printf("%s: ",node->name);
+    int first=1;
+    for(int j=0;j<node->out_degree;j++){
+        if(graph->edges[j].from==i)
+        if(!first){
+            printf("->");
+        }
+        printf("%s",graph->nodes[graph->edges[j].to].name);
+        first=0;
+    }
+printf("\n");
+}
+printf("\n=====================================\n");
 }
