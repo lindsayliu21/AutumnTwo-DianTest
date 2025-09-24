@@ -90,31 +90,38 @@ int has_cycle(DependencyGraph *graph);
 int has_cycle_dfs(DependencyGraph *graph,int node,int *visited,int *stack);
 int main(int argc, char *argv[])
 {
-    if (argc != 3) {
-        printf("用法: %s <makefile> <target>\n", argv[0]);
-        printf("示例: %s Makefile app\n", argv[0]);
+    if (argc != 2) {
+        printf("用法:./minimake <target>\n");
+        printf("示例:./minimake app\n");
+        return 1;
+    }
+    if(strcmp(argv[0],"./minimake")!=0){
+        printf("用法:./minimake <target>\n");
+        printf("示例:./minimake app \n");
         return 1;
     }
     DependencyGraph graph;
     ParserState state;
     init_graph(&graph);
     init_parser(&state);
+    char *filename="Makefile_cleared.mk";
     // 解析Makefile
-    parse_makefile(argv[1], &state,&graph);
+    parse_makefile(filename, &state,&graph);
     
     // 检查依赖
     check_dependencies(&state);
-
+    char *target=argv[1];
+    int target_idx = is_target_defined(&state, target);
+    if (target_idx == -1)
+    {
+        printf("Target '%s' not defines!!\n)", target);
+        return 1;
+    }
     // 输出依赖图
     print_dependency_graph(&graph);
     
-    //检测循环依赖
-    if(has_cycle(&graph)){
-    printf("Error: Detected a circulsr dependency!!\n");
-    return 1;
-    }
     // 执行指定目标
-    int result = execute_target_topologically(&state, argv[2],&graph);
+    int result = execute_target_topologically(&state, target,&graph);
     
     return result;
 }
@@ -401,18 +408,18 @@ int execute_command(const char *cmd)
 
 int execute_target_topologically(ParserState *state, const char *target,DependencyGraph *graph)
 {
-    int target_idx = is_target_defined(state, target);
-    if (target_idx == -1)
-    {
-        printf("Target '%s' not defines!!\n)", target);
-        return 1;
+
+    //检测循环依赖
+    if(has_cycle(graph)){
+    printf("Error: Detected a circular dependency!!\n");
+    return 1;
     }
     // 进行拓扑排序
     int *sort_result = (int*)malloc(graph->node_count * sizeof(int));
     int sort_count = topological_sort(graph, sort_result);
-
+    //双重检测循环依赖
     if (sort_count == -1) {
-        printf("Error: Detected a dependency!!\n");
+        printf("Error: Detected a circular dependency!!\n");
         free(sort_result);
         return 1;
     }
