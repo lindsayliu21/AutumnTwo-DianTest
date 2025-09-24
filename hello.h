@@ -1,5 +1,5 @@
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef HELLO_H
+#define HELLO_H
 
 // 打印问候信息
 void print_hello();

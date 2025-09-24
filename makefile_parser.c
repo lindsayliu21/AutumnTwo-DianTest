@@ -74,7 +74,7 @@ void check_dependencies(ParserState *state);
 // 执行命令
 int execute_command(const char *cmd);
 // 执行目标
-int execute_target(ParserState *state, const char *target);
+int execute_target_topologically(ParserState *state, const char *target,DependencyGraph *graph);
 //初始化依赖图
 void init_graph(DependencyGraph *graph);
 //找到和增加节点（目标、依赖、文件）
@@ -83,6 +83,11 @@ int find_or_add_node(DependencyGraph *graph, const char *name);
 void add_edges(DependencyGraph *graph, const char *from,const char *to);
 //打印依赖图，各个目标/依赖的入度（目标）、出度（依赖）
 void print_dependency_graph(DependencyGraph *graph);
+//拓扑排序
+int topological_sort(DependencyGraph *graph, int *result);
+//检查循环依赖
+int has_cycle(DependencyGraph *graph);
+int has_cycle_dfs(DependencyGraph *graph,int node,int *visited,int *stack);
 int main(int argc, char *argv[])
 {
     if (argc != 3) {
@@ -100,11 +105,16 @@ int main(int argc, char *argv[])
     // 检查依赖
     check_dependencies(&state);
 
-    //输出依赖图
+    // 输出依赖图
     print_dependency_graph(&graph);
     
+    //检测循环依赖
+    if(has_cycle(&graph)){
+    printf("Error: Detected a circulsr dependency!!\n");
+    return 1;
+    }
     // 执行指定目标
-    int result = execute_target(&state, argv[2]);
+    int result = execute_target_topologically(&state, argv[2],&graph);
     
     return result;
 }
@@ -147,8 +157,8 @@ void add_edges(DependencyGraph *graph, const char *from,const char *to){
         exit(1);
     }
     //更新节点的度数
-    graph->nodes[from_idx].in_degree++;
-    graph->nodes[from_idx].out_degree++;
+    graph->nodes[from_idx].out_degree++;  // from节点的出度增加
+    graph->nodes[to_idx].in_degree++;     // to节点的入度增加
     //添加边
     if(graph->edge_count<MAX_EDGES){
         graph->edges[graph->edge_count].from=from_idx;
@@ -175,6 +185,87 @@ int is_file_exists(const char *filename)
 {
     struct stat statbuf;
     return (stat(filename, &statbuf) == 0); // 返回1表示文件存在
+}
+
+
+
+int has_cycle(DependencyGraph *graph){
+    //给visited数组和队列数组份配空间并初始化全部赋值为0
+    //标记顶点是否被访问过的数组（0=未访问，1=已访问）
+    int *visited=(int *)calloc(graph->node_count,sizeof(int));
+    //标记顶点是否处于 “当前递归路径” 上的数组(0=不在，1=在)
+    int *stack=(int *)calloc(graph->node_count,sizeof(int ));
+    //遍历所有节点
+    for(int i=0;i<graph->node_count;i++){
+        if(has_cycle_dfs(graph,i,visited,stack)){
+            free(visited);
+            free(stack);
+            return 1;
+        }  
+    }
+    free(visited);
+    free(stack);
+    return 0;
+}
+int has_cycle_dfs(DependencyGraph *graph,int node,int *visited,int *stack){
+    //若顶点未访问，则标记访问过
+    if(visited[node]==0){
+        visited[node]=1;
+        stack[node]=1;
+    }
+    // 遍历所有从v出发的边（即v的所有邻接顶点）
+    for(int i=0;i<graph->edge_count;i++){
+        if(graph->edges[i].from==node){
+            int dep=graph->edges[i].to;
+            //情况1：邻接顶点dep未访问过，递归检查dep
+            //若发现有环，则返回1；
+            if(visited[dep]==0&&has_cycle_dfs(graph,dep,visited,stack)){
+                return 1;
+            }
+            //情况2：邻接顶点dep访问过 且 在当前递归路径上，说明存在循环依赖
+            else if(stack[dep]){
+                return 1;
+            }
+        }
+    }
+    stack[node]=0;
+    return 0; 
+}
+
+int topological_sort(DependencyGraph *graph, int *result) {
+    //创建入度数组
+    int * in_degree=(int*)calloc(graph->node_count,sizeof(int));
+    for(int i=0;i<graph->node_count;i++){
+        in_degree[i]=graph->nodes[i].in_degree;
+    }  
+    //创建队列
+    int *queue=(int *)malloc(graph->node_count*sizeof(int));
+    int front=0;int rear=0;
+    int result_id=0;
+    //将入度为0的节点加入队列
+    for(int i=0;i<graph->node_count;i++){
+        if(in_degree[i]==0){
+            queue[rear++]=i;
+        }
+    }
+    while(front<rear){
+        int v=queue[front++];
+        result[result_id++]=v;  // 存储处理结果
+        // 遍历所有从v出发的边
+        for(int j=0;j<graph->edge_count;j++){
+            if(graph->edges[j].from==v){
+                int adj = graph->edges[j].to;  // 获取邻接节点
+                in_degree[adj]--;  // 减少邻接节点的入度
+                if(in_degree[adj]==0) {  // 如果邻接节点入度为0
+                    queue[rear++]=adj;  // 将邻接节点加入队列
+                }
+            }
+        }    
+    }
+    free(in_degree);
+    free(queue);
+    if(graph->node_count!=result_id) return -1;  // 检查处理的节点数
+    return result_id;
 }
 
 void check_dependencies(ParserState *state)
@@ -308,7 +399,7 @@ int execute_command(const char *cmd)
     }
 }
 
-int execute_target(ParserState *state, const char *target)
+int execute_target_topologically(ParserState *state, const char *target,DependencyGraph *graph)
 {
     int target_idx = is_target_defined(state, target);
     if (target_idx == -1)
@@ -316,24 +407,37 @@ int execute_target(ParserState *state, const char *target)
         printf("Target '%s' not defines!!\n)", target);
         return 1;
     }
-    Rule *rule = &state->rules[target_idx];
-    // 先执行所有的依赖文件
-    for(int i=0;i<rule->dep_count;i++){
-        const char *dep=rule->dependencies[i];
-        int is_target_id=is_target_defined(state,dep);
-        //如果依赖是目标，先执行目标
-        if(is_target_id!=-1){
-        int result= execute_target(state,dep);
-        if(result!=0) 
-        return result;
+    // 进行拓扑排序
+    int *sort_result = (int*)malloc(graph->node_count * sizeof(int));
+    int sort_count = topological_sort(graph, sort_result);
+
+    if (sort_count == -1) {
+        printf("Error: Detected a dependency!!\n");
+        free(sort_result);
+        return 1;
+    }
+
+    printf("\n拓扑排序结果（构建顺序）:\n");
+    for (int i = 0; i < sort_count; i++) {
+        printf("%s ", graph->nodes[sort_result[i]].name);
+    }
+    printf("\n\n");
+
+    for(int i=sort_count-1;i>=0;i--){
+        const char* target_1=graph->nodes[sort_result[i]].name;
+        int target_id=is_target_defined(state,target_1);
+        if(target_id!=-1){
+            Rule *rule=&state->rules[target_id];
+            printf("Executing %s target...\n",target_1);
+            for(int j=0;j<rule->cmd_count;j++){
+                Command *uncmd=&rule->commands[j];  
+                int result=execute_command(uncmd->cmd);
+                if(result!=0)
+                    return result;
+            }
         }
     }
-    for(int i=0;i<rule->cmd_count;i++){
-        Command *uncmd=&rule->commands[i];
-        int result=execute_command(uncmd->cmd);
-        if(result!=0)
-        return result;
-    }
+    free(sort_result);
     return 0;
 }
 
@@ -350,27 +454,28 @@ for(int i=0;i<graph->node_count;i++){
 
 //打印所有边
 printf("\n边列表（共 %d 条）：\n",graph->edge_count);
-printf("序号\t源节点——>目标节点\n");
+printf("序号\t%-32s——>%-32s\n","源节点","目标节点");
 for(int i=0;i<graph->edge_count;i++){
     Edge *edge=&graph->edges[i];
-    printf("%d\t%s\t%s\n",i,graph->nodes[edge->from].name,graph->nodes[edge->to].name);
+    printf("%d\t%s\t %s\n",i,graph->nodes[edge->from].name,graph->nodes[edge->to].name);
 }
 
 //打印邻接表形式
 printf("\n邻接表形式：\n");
 for(int i=0;i<graph->node_count;i++){
     Node *node=&graph->nodes[i];
-    printf("%s: ",node->name);
+    printf("%-32s: ",node->name);
     int first=1;
-    for(int j=0;j<node->out_degree;j++){
-        if(graph->edges[j].from==i)
-        if(!first){
-            printf("->");
+    for(int j=0;j<graph->edge_count;j++){
+        if(graph->edges[j].from==i) {
+            if(!first){
+                printf("->");
+            }
+            printf("%s",graph->nodes[graph->edges[j].to].name);
+            first=0;
         }
-        printf("%s",graph->nodes[graph->edges[j].to].name);
-        first=0;
     }
-printf("\n");
+    printf("\n");
 }
 printf("\n=====================================\n");
 }
