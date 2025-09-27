@@ -14,7 +14,8 @@
 #define MAX_DEPEND_NUM 30    // 每个目标最大依赖数量
 #define MAX_COMMAND_NUM 30   // 每个目标最大命令数量
 #define MAX_NODES 50
-#define MAX_EDGES 100 
+#define MAX_EDGES 100
+#include "variable.h" 
 
 //节点结构体
 typedef struct{
@@ -68,13 +69,13 @@ int is_target_defined(ParserState *state, const char *target);
 // 检查文件是否存在
 int is_file_exists(const char *filename);
 //// 解析Makefile并检查规则
-void parse_makefile(const char *filename,ParserState *state,DependencyGraph *graph);
+void parse_makefile(const char *filename,ParserState *state,DependencyGraph *graph,VariableTable *variable_table);
 // 检查依赖是否有效
 void check_dependencies(ParserState *state);
 // 执行命令
 int execute_command(const char *cmd);
 // 执行目标
-int execute_target_topologically(ParserState *state, const char *target,DependencyGraph *graph);
+//int execute_target_topologically(ParserState *state, const char *target,DependencyGraph *graph);
 //初始化依赖图
 void init_graph(DependencyGraph *graph);
 //找到和增加节点（目标、依赖、文件）
@@ -111,11 +112,13 @@ int main(int argc, char *argv[])
     }
     DependencyGraph graph;
     ParserState state;
+    VariableTable variable_table;
     init_graph(&graph);
     init_parser(&state);
+    init_variable_table(&variable_table);
     char *filename="Makefile_cleared.mk";
     // 解析Makefile
-    parse_makefile(filename, &state,&graph);
+    parse_makefile(filename, &state,&graph,&variable_table);
     
     // 检查依赖
     check_dependencies(&state);
@@ -307,7 +310,7 @@ void check_dependencies(ParserState *state)
     }
 }
 
-void parse_makefile(const char *filename,ParserState *state,DependencyGraph *graph)
+void parse_makefile(const char *filename,ParserState *state,DependencyGraph *graph,VariableTable *variable_table)
 {
     FILE *file = fopen(filename, "r");
     if (!file)
@@ -326,6 +329,9 @@ void parse_makefile(const char *filename,ParserState *state,DependencyGraph *gra
         // 检查是否为目标行（不以Tab开头）
         if (line[0] != '\t')
         {
+            int var_lined= parse_variable_line(variable_table, line);
+            if(var_lined) continue; //变量行，继续读取下一行
+            // 处理目标行
             // 查找冒号分隔符
             char *colon = strchr(line, ':');
             if (colon)
@@ -347,6 +353,10 @@ void parse_makefile(const char *filename,ParserState *state,DependencyGraph *gra
                     printf("Line%d: Duplicate target definition '%s'.  ", line_num, target_str);
                     printf(" The previous definition is right here: Line%d\n", state->rules[existing_idx].line_num);
                 }
+                // 去除目标末尾的空格
+                char *target_str_end = target_str + strlen(target_str) - 1;
+                while ( target_str_end> target_str && isspace((unsigned char)*target_str_end)) target_str_end--;
+                *(target_str_end + 1) = '\0';
                 //将目标加入节点列表中
                 find_or_add_node(graph,target_str);
 
@@ -357,8 +367,11 @@ void parse_makefile(const char *filename,ParserState *state,DependencyGraph *gra
                 current_rule->cmd_count = 0;
                 current_rule->line_num = line_num;
 
+                //依赖中有嵌套变量
+                char *expanded_deps = expand_variables(variable_table, deps_str);
                 // 解析依赖
-                char *dep = strtok(deps_str, " ");
+                if(expanded_deps){
+                char *dep = strtok(expanded_deps, " ");
                 while (dep)
                 {
                     if (strlen(dep) > 0)
@@ -371,6 +384,8 @@ void parse_makefile(const char *filename,ParserState *state,DependencyGraph *gra
                     }
                     dep = strtok(NULL, " ");
                 }
+                free(expanded_deps);
+            }
             }
         }
         // 有Tab,则为命令行
@@ -378,10 +393,13 @@ void parse_makefile(const char *filename,ParserState *state,DependencyGraph *gra
         {
             // 存储命令，去除开头的Tab
             char *cmd = line + 1;
-            if (strlen(cmd) > 0)
+            //如果命令中含有变量
+            char *expanded_cmd = expand_variables(variable_table, cmd);
+            if (expanded_cmd && strlen(expanded_cmd) > 0)
             {
-                strncpy(current_rule->commands[current_rule->cmd_count].cmd, cmd, MAX_LINE_LEN - 1);
+                strncpy(current_rule->commands[current_rule->cmd_count].cmd, expanded_cmd, MAX_LINE_LEN - 1);
                 current_rule->commands[current_rule->cmd_count].cmd[MAX_LINE_LEN - 1] = '\0';
+                free(expanded_cmd);
                 current_rule->cmd_count++;
             }
         }

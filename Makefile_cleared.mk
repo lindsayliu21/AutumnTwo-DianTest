@@ -1,6 +1,9 @@
+OBJS = main.o hello.o
+CC = gcc
+CFLAGS = -Wall
+app:$(OBJS)
+	$(CC) $(CFLAGS) -o app $(OBJS)
+main.o:main.c
+	$(CC) $(CFLAGS) -c main.c
 hello.o:hello.c
-	gcc -c hello.c
-main.o: main.c
-	gcc -c main.c -o main.o
-program:main.o hello.o
-	gcc main.o hello.o -o program
+	$(CC) $(CFLAGS) -c hello.c

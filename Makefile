@@ -1,14 +1,17 @@
-# 示例Makefile文件
-# 包含多个目标和依赖关系，用于测试makefile解析器
+#变量定义
+OBJS = main.o hello.o
+CC = gcc
+CFLAGS = -Wall
 
+#1、最终目标：依赖OBJS（中间目标）
+app:$(OBJS)
+	$(CC) $(CFLAGS) -o app $(OBJS)
+#中间目标1：依赖源文件main.c
+main.o:main.c
+	$(CC) $(CFLAGS) -c main.c
+#中间目标2：依赖源文件hello.c
 hello.o:hello.c
-	gcc -c hello.c 
-
-main.o: main.c 
-	gcc -c main.c -o main.o
-
-program:main.o hello.o
-	gcc main.o hello.o -o program
+	$(CC) $(CFLAGS) -c hello.c
 
 
 

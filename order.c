@@ -185,7 +185,10 @@ int is_t_or_c=is_target_or_command_line(line);
 //检查目标行是否缺少冒号：
 if(is_t_or_c){
 const char *ptr=line;
-if(strchr(ptr,':')==NULL)  return MISS_COLON;
+if(strchr(ptr,':')==NULL){
+if(strchr(ptr,'=')) return NO_ERROR;
+  return MISS_COLON;
+}
 }
 //检查命令行是否缺少Tab
 else if(!is_t_or_c){
