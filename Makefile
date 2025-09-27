@@ -1,27 +1,31 @@
-#变量定义
-OBJS = main.o hello.o
 CC = gcc
-CFLAGS = -Wall -O2
+CFLAGS = -Wall -std=c99
 
-#1、最终目标：依赖OBJS（中间目标）
-app:$(OBJS)
-	$(CC) $(CFLAGS) -o app $(OBJS)
-#中间目标1：依赖源文件main.c
-main.o:main.c
-	$(CC) $(CFLAGS) -c main.c
-#中间目标2：依赖源文件hello.c
-hello.o:hello.c
-	$(CC) $(CFLAGS) -c hello.c
+# 定义所有源文件
+SRCS = main.c variable.c graph.c parser.c build.c
 
+# 定义目标文件
+OBJS = $(SRCS:.c=.o)
 
+# 最终可执行文件
+TARGET = minimake
 
+# 默认目标
+all: $(TARGET)
 
+# 链接目标
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
 
+# 编译规则
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
+# 清理目标
+clean:
+	rm -f $(OBJS) $(TARGET)
 
+# 重新构建
+rebuild: clean all
 
-
-
-
-
-
+.PHONY: all clean rebuild
