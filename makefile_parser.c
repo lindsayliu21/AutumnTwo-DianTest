@@ -319,6 +319,9 @@ void parse_makefile(const char *filename,ParserState *state,DependencyGraph *gra
         return;
     }
     
+    // 清空变量表，确保每个Makefile都有自己独立的变量空间
+    init_variable_table(variable_table);
+    
     char line[MAX_LINE_LEN];
     int line_num = 0;
     Rule *current_rule = NULL;
@@ -452,7 +455,7 @@ int build_target_if_needed(Rule *rule) {
         case 1://需要重新构建
             printf("Staring to build target '%s'...\n",rule->target);
             for(int i=0;i<rule->cmd_count;i++){
-                printf("Extcuting command %s\n", rule->commands[i].cmd);
+                
                 int result=execute_command(rule->commands[i].cmd);
                 if(result){
                     printf("Failed to build target '%s' \n",rule->target);
@@ -525,7 +528,7 @@ int execute_build_with_timestamp_check(ParserState *state, const char *target_na
         int target_id = is_target_defined(state, current_target);
         if(target_id != -1){
             Rule *rule = &state->rules[target_id];
-            printf("处理目标: %s\n", current_target);
+            printf("Deal with target: %s\n", current_target);
             int result = build_target_if_needed(rule);
             if(result){
                 free(sort_result);

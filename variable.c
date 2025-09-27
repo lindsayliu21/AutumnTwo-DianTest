@@ -1,13 +1,14 @@
 #include "variable.h"
+
+
 void init_variable_table(VariableTable* table){
     table->var_count=0;
     memset(table->variables,0,sizeof(table->variables));
-
 }
 
-void set_variable(VariableTable* table, const char* name, const char* value){
+void set_variable(VariableTable* table, const char* name, const char* value, VariableScope scope){
     //已经存在该变量则更新
-   int index=find_variable(table,name);
+   int index=find_variable(table,name,scope);
    if(index>=0){
         strncpy(table->variables[index].value,value,MAX_VAR_VALUE-1);
         table->variables[index].value[MAX_VAR_VALUE-1]='\0';
@@ -19,21 +20,25 @@ void set_variable(VariableTable* table, const char* name, const char* value){
         table->variables[table->var_count].name[MAX_VAR_NAME-1]='\0';
         strncpy(table->variables[table->var_count].value,value,MAX_VAR_VALUE-1);
         table->variables[table->var_count].value[MAX_VAR_VALUE-1]='\0';
+        table->variables[table->var_count].scope = scope; 
         table->var_count++;
 
     }
 }
-int find_variable(VariableTable* table,const char*name){
+
+int find_variable(VariableTable* table,const char*name,VariableScope scope){
     for(int i=0;i<table->var_count;i++){
-        if(strcmp(table->variables[i].name,name)==0){
+        if(strcmp(table->variables[i].name,name)==0&&table->variables[i].scope == scope){
             return i;
         }
     }
     return -1;
 }
+
 const char *get_variable(VariableTable* table,const char*name){
-   return find_variable(table,name)>=0?table->variables[find_variable(table,name)].value:NULL;
+   return find_variable(table,name,SCOPE_MAKEFILE)>=0?table->variables[find_variable(table,name,SCOPE_MAKEFILE)].value:NULL;
 }
+
 int  extract_variable_name(const char * str,char *var_name){
 if(str[0]!='$'){
 return 0;
@@ -65,6 +70,7 @@ else if(str[1]=='{'){
     var_name[len]='\0';
     return end-str+1;
 }
+return 0;
 }
 
 char* expand_variables(VariableTable* table, const char* input){
@@ -113,6 +119,7 @@ char* expand_variables(VariableTable* table, const char* input){
     }
 return output;
 }
+
 int parse_variable_line(VariableTable* table, char* line){
 if(line[0]!='\t'){
     char *var_equal=strchr(line,'=');
@@ -139,17 +146,17 @@ if(line[0]!='\t'){
     // 处理变量值中的变量引用（嵌套展开）
     char *expanded_value = expand_variables(table, var_value);
     if (expanded_value) {
-        set_variable(table, var_name, expanded_value);
+        set_variable(table, var_name, expanded_value,SCOPE_MAKEFILE);
         free(expanded_value);
     } else {
-        set_variable(table, var_name, var_value);
+        set_variable(table, var_name, var_value,SCOPE_MAKEFILE);
     }  
     return 1; // 成功解析变量定义
 }
 else if(line[0]=='\t'){
     char *lined=expand_variables(table, line);
+    free(lined);
     return 1;
 }
 return 0;//不含变量行，解析失败
 }
-

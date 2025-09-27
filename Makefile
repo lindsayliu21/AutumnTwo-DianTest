@@ -1,7 +1,7 @@
 #变量定义
 OBJS = main.o hello.o
 CC = gcc
-CFLAGS = -Wall
+CFLAGS = -Wall -O2
 
 #1、最终目标：依赖OBJS（中间目标）
 app:$(OBJS)
