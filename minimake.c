@@ -6,7 +6,7 @@
 #include "make_build.h"
 
 int main(int argc, char *argv[])
-{
+{   
     if (argc != 2) {
         printf("Usages:./minimake <target>\n");
         printf("Example:./minimake app\n");

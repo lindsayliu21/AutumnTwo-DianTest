@@ -62,7 +62,7 @@ void print_dependency_graph(DependencyGraph *graph){
     printf("序号\t%-32s——>%-32s\n","源节点","目标节点");
     for(int i=0;i<graph->edge_count;i++){
         Edge *edge=&graph->edges[i];
-        printf("%d\t%s\t %s\n",i,graph->nodes[edge->from].name,graph->nodes[edge->to].name);
+        printf("%d\t%-16s\t%-16s\n",i,graph->nodes[edge->from].name,graph->nodes[edge->to].name);
     }
 
     //打印邻接表形式

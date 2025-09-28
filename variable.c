@@ -1,6 +1,5 @@
 #include "variable.h"
 
-
 void init_variable_table(VariableTable* table){
     table->var_count=0;
     memset(table->variables,0,sizeof(table->variables));
@@ -74,7 +73,18 @@ return 0;
 }
 
 char* expand_variables(VariableTable* table, const char* input){
+    return expand_variables_with_depth(table, input, 0);
+}
+
+char* expand_variables_with_depth(VariableTable* table, const char* input, int depth){
     if(!input) return NULL;
+    
+    // 检查递归深度，防止无限递归
+    if(depth > MAX_EXPANSION_DEPTH) {
+        fprintf(stderr, "Warning: Maximum variable expansion depth exceeded\n");
+        return NULL;
+    }
+    
     size_t max_output_len = MAX_VAR_VALUE * 4; 
     char * output =(char*) malloc(max_output_len);
     if(!output) return NULL;
@@ -89,35 +99,45 @@ char* expand_variables(VariableTable* table, const char* input){
            const char * var_value=get_variable(table,var_name);
             if(var_value){
                 //递归展开变量值中的嵌套引用
-            char * expanded_value=expand_variables(table,var_value);
-            if(expanded_value){
-                size_t expanded_len = strlen(expanded_value);
-                // 检查缓冲区是否足够，避免溢出
-                if (output_len + expanded_len < max_output_len - 1) {
-                    strcat(output, expanded_value);
-                    output_len += expanded_len;
+                char * expanded_value=expand_variables_with_depth(table, var_value, depth+1);
+                if(expanded_value){
+                    size_t expanded_len = strlen(expanded_value);
+                    // 检查缓冲区是否足够，避免溢出
+                    if (output_len + expanded_len < max_output_len - 1) {
+                        strcat(output, expanded_value);
+                        output_len += expanded_len;
+                    }
+                    else {
+                        fprintf(stderr, "Warning: Variable expansion overflow for '%s'\n", var_name);
+                    }
+                    free(expanded_value);
                 }
-                else {
-                    fprintf(stderr, "Warning: Variable expansion overflow for '%s'\n", var_name);
-                }
-                free(expanded_value);
+                else{     
+                    // 变量未定义或递归深度超限，直接添加原始变量名
+                    if(output_len + var_len < max_output_len - 1) {
+                        strncat(output, input+i, var_len);
+                        output_len += var_len;
+                    }
+                    else {
+                        fprintf(stderr, "Warning: Variable expansion overflow for '%s'\n", var_name);
+                    }
+                }                         
+                i += var_len;
+                continue;
             }
-            else{     
-            // 变量未定义，输出警告但继续处理
-            fprintf(stderr, "Warning: variable '%s' is not defined!!\n", var_name); }                         
-            i += var_len;
-            continue;
-            
+            else {
+                // 变量未定义，输出警告但继续处理
+                fprintf(stderr, "Warning: variable '%s' is not defined!!\n", var_name);
             }
         }
-// 处理普通字符，确保不溢出
+        // 处理普通字符，确保不溢出
         if (output_len < max_output_len - 1) {
             output[output_len++] = input[i];
             output[output_len] = '\0'; // 实时更新终止符
         }
         i++;
     }
-return output;
+    return output;
 }
 
 int parse_variable_line(VariableTable* table, char* line){

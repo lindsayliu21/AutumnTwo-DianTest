@@ -1,20 +1,32 @@
-# 示例Makefile文件
-# 包含多个目标和依赖关系，用于测试makefile解析器
+CC = gcc
+CFLAGS = -Wall -O2
 
-main.o: main.c defs.h
-	gcc -c main.c
+# 定义所有源文件
+SRCS = variable.c dependency_graph.c make_parser.c make_build.c minimake.c
 
-defs.h: parse.c
-	touch defs.h
+# 定义目标文件
+OBJS = $(SRCS:.c=.o)
 
-parse.o: parse.c defs.h
-	gcc -c parse.c
+# 最终可执行文件
+TARGET = minimake
 
-lexer.o: lexer.c defs.h
-	gcc -c lexer.c
+# 默认目标
+all: $(TARGET)
 
-util.o: util.c
-	gcc -c util.c
+# 链接目标
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
 
-app: main.o parse.o lexer.o util.o
-	gcc -o app main.o parse.o lexer.o util.o
+
+# 编译规则
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+
+# 清理目标(删除所有中间文件)
+clean:
+	rm -f $(OBJS) $(TARGET)
+
+# 重新构建
+rebuild: clean all
+.PHONY: all clean rebuild

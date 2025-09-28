@@ -1,6 +1,5 @@
 #变量定义
-OBJS1 = hello.o
-OBJS = main.o $(OBJS1)
+OBJS = main.o hello.o
 CC = gcc
 CFLAGS = -Wall -O2
 
@@ -14,5 +13,5 @@ main.o:main.c
 	$(CC) $(CFLAGS) -c main.c
 #中间目标2：依赖源文件hello.c
 
-${OBJS1}:hello.c
+hello.o:hello.c
 	$(CC) $(CFLAGS) -c hello.c

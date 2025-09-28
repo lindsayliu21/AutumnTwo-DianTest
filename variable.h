@@ -4,14 +4,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include<ctype.h>
-#include<unistd.h>
+#include <ctype.h>
+#include <unistd.h>
+
 //最大变量名长度
 #define MAX_VAR_NAME 33
 //最大变量值长度
 #define MAX_VAR_VALUE 256 
 //最大变量个数
 #define MAX_VARIABLES 50
+//变量展开最大递归深度
+#define MAX_EXPANSION_DEPTH 10
 
 // 定义变量作用域类型
 typedef enum {
@@ -46,5 +49,7 @@ int parse_variable_line(VariableTable* table, char* line);
 int  extract_variable_name(const char* str,char *var_name);
 // 展开字符串中的变量（替换 $(VAR) 或 ${VAR} 为实际值)
 char* expand_variables(VariableTable* table, const char* input);
+char* expand_variables_with_depth(VariableTable* table, const char* input, int depth);
+
 
 #endif

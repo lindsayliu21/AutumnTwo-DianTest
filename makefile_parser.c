@@ -348,23 +348,25 @@ void parse_makefile(const char *filename,ParserState *state,DependencyGraph *gra
                 {
                     printf("Line%d: Invalid target defined!!\n", line_num);
                 }
-                
+                //目标中嵌套变量
+                char *expanded_target = expand_variables(variable_table, target_str);
+                if(expanded_target){
                 // 检查目标是否已定义
-                int existing_idx = is_target_defined(state, target_str);
+                int existing_idx = is_target_defined(state, expanded_target);
                 if (existing_idx != -1)
                 {
-                    printf("Line%d: Duplicate target definition '%s'.  ", line_num, target_str);
+                    printf("Line%d: Duplicate target definition '%s'.  ", line_num, expanded_target);
                     printf(" The previous definition is right here: Line%d\n", state->rules[existing_idx].line_num);
                 }
                 // 去除目标末尾的空格
-                char *target_str_end = target_str + strlen(target_str) - 1;
-                while ( target_str_end> target_str && isspace((unsigned char)*target_str_end)) target_str_end--;
-                *(target_str_end + 1) = '\0';
+                char *target_end = expanded_target + strlen(expanded_target)- 1;
+                while ( target_end> expanded_target && isspace((unsigned char)*target_end)) target_end--;
+                *(target_end + 1) = '\0';
                 //将目标加入节点列表中
-                find_or_add_node(graph,target_str);
-
+                find_or_add_node(graph,expanded_target);
+            }
                 current_rule = &state->rules[state->rule_count++];
-                strncpy(current_rule->target, target_str, MAX_FILE_NAME_LEN - 1);
+                strncpy(current_rule->target, expanded_target, MAX_FILE_NAME_LEN - 1);
                 current_rule->target[MAX_FILE_NAME_LEN - 1] = '\0';
                 current_rule->dep_count = 0;
                 current_rule->cmd_count = 0;
@@ -383,11 +385,12 @@ void parse_makefile(const char *filename,ParserState *state,DependencyGraph *gra
                         current_rule->dependencies[current_rule->dep_count][MAX_FILE_NAME_LEN - 1] = '\0';
                         current_rule->dep_count++;
                         find_or_add_node(graph,dep);
-                        add_edges(graph,target_str,dep);
+                        add_edges(graph,expanded_target,dep);
                     }
                     dep = strtok(NULL, " ");
                 }
                 free(expanded_deps);
+                free(expanded_target);
             }
             }
         }
